@@ -1,113 +1,87 @@
-/*
-   Copyright (c) 2015, Majenko Technologies
-   All rights reserved.
-   Redistribution and use in source and binary forms, with or without modification,
-   are permitted provided that the following conditions are met:
- * * Redistributions of source code must retain the above copyright notice, this
-     list of conditions and the following disclaimer.
- * * Redistributions in binary form must reproduce the above copyright notice, this
-     list of conditions and the following disclaimer in the documentation and/or
-     other materials provided with the distribution.
- * * Neither the name of Majenko Technologies nor the names of its
-     contributors may be used to endorse or promote products derived from
-     this software without specific prior written permission.
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-/* Create a WiFi access point and provide a web server on it. */
-
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include "Motor/Motor.h"
 
-/* Set these to your desired credentials. */
-const char *ssid = "IntelliVent";
-const char *password = "Int3ll1V3nt!";
+/* WiFi credentials */
+const char ssid[] = "YOUR_SSID_HERE";
+const char password[] = "YOUR_PASSWORD_HERE";
 
 ESP8266WebServer server(80);
+bool connected = false;
+bool isMoving = false;
 
-/* Just a little test message.  Go to http://192.168.4.1 in a web browser
-   connected to this access point to see it.
-*/
-void handleRoot()
+void handleMove()
 {
-  server.send(200, "text/html", "<h1>You are connected to IntelliVent!</h1>");
-}
+  // Tell client the move will be handled
+  server.send(200, "application/json", "{}");
 
-void handleConnect()
-{
-  if (server.hasArg("ssid") && server.hasArg("pwd")) {
-    /* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
-     would try to act as both a client and an access-point and could cause
-     network-issues with your other WiFi-devices on your WiFi-network. */
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(server.arg("ssid"), server.arg("pwd"));
-
-    int tryCount = 0;
-    while (WiFi.status() != WL_CONNECTED || tryCount >= 10) {
-      delay(1000);
-      tryCount++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("connected to " + server.arg("ssid"));
-      Serial.println("IP address: ");
-      Serial.println(WiFi.localIP());
-    }
-    else {
-      WiFi.mode(WIFI_AP);
-      WiFi.softAP(ssid, password);
-      server.send(200, "text/html", "Unable to connect to " + server.arg("ssid"));
-    }
+  // Return early and don't rotate if already moving or if there's no name arg
+  if (isMoving)
+  {
+    Serial.println("I'm already moving!");
+    return;
   }
-}
-
-void handleNotFound()
-{
-  String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  if (!server.hasArg("name"))
+  {
+    Serial.println("No 'name' arg provided.");
+    return;
   }
-  server.send(404, "text/plain", message);
+
+  // Rotate motor clockwise for "close" and counter-clockwise for "open"
+  Serial.println(server.arg("name"));
+  isMoving = true;
+  Motor::rotateMotor(server.arg("name") == "close", 180);
+  isMoving = false;
 }
 
 void setup()
 {
-  delay(1000);
   Serial.begin(9600);
-  Serial.println();
-  Serial.print("Configuring access point...");
-  /* You can remove the password parameter if you want the AP to be open. */
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
 
-  IPAddress myIP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(myIP);
-  server.on("/", handleRoot);
-  server.on("/connect", handleConnect);
-  server.onNotFound(handleNotFound);
+  // Configure pins to be output and turned off
+  int control_pins_len = (sizeof(MOTOR_CONTROL_PINS) / sizeof(MOTOR_CONTROL_PINS[0]));
+  for (int x = 0; x < control_pins_len; x++)
+  {
+    pinMode(MOTOR_CONTROL_PINS[x], OUTPUT);
+    digitalWrite(MOTOR_CONTROL_PINS[x], LOW);
+  }
+
+  // Connect to WiFi
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  int tryCount = 0;
+  while (WiFi.status() != WL_CONNECTED || tryCount >= 10)
+  {
+    Serial.print("Trying to connect to ");
+    Serial.println(ssid);
+    delay(1000);
+    tryCount++;
+
+    connected = WiFi.status() == WL_CONNECTED;
+    if (connected)
+    {
+      Serial.println("IP address: ");
+      Serial.println(WiFi.localIP());
+    }
+  }
+
+  if (!connected)
+  {
+    Serial.println("Failed to connect to WiFi. Not starting web server.");
+    WiFi.mode(WIFI_OFF);
+    return;
+  }
+
+  // Start web server and listen for requests to the /move endpoint
+  server.on("/move", handleMove);
   server.begin();
-  Serial.println("HTTP server started");
 }
 
 void loop()
 {
-  server.handleClient();
+  if (connected)
+  {
+    // Handle client requests to erver
+    server.handleClient();
+  }
 }
