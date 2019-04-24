@@ -30,7 +30,7 @@ void Motor::rotateMotor(bool clockwise, float degrees)
         {
           digitalWrite(MOTOR_CONTROL_PINS[k], HALFSTEP_SEQUENCE[j][k]);
         }
-        delayMicroseconds(1000);
+        delayMicroseconds(800);
       }
     }
     else
@@ -41,8 +41,15 @@ void Motor::rotateMotor(bool clockwise, float degrees)
         {
           digitalWrite(MOTOR_CONTROL_PINS[k], HALFSTEP_SEQUENCE[j][k]);
         }
-        delayMicroseconds(1000);
+        delayMicroseconds(800);
       }
     }
+  }
+
+  // Reset and turn off all pins after rotation
+  int control_pins_len = (sizeof(MOTOR_CONTROL_PINS) / sizeof(MOTOR_CONTROL_PINS[0]));
+  for (int x = 0; x < control_pins_len; x++)
+  {
+    digitalWrite(MOTOR_CONTROL_PINS[x], LOW);
   }
 }
