@@ -30,7 +30,7 @@ void Motor::rotateMotor(bool clockwise, float degrees)
         {
           digitalWrite(MOTOR_CONTROL_PINS[k], HALFSTEP_SEQUENCE[j][k]);
         }
-        delayMicroseconds(800);
+        delay(1);
       }
     }
     else
@@ -41,7 +41,7 @@ void Motor::rotateMotor(bool clockwise, float degrees)
         {
           digitalWrite(MOTOR_CONTROL_PINS[k], HALFSTEP_SEQUENCE[j][k]);
         }
-        delayMicroseconds(800);
+        delay(1);
       }
     }
   }

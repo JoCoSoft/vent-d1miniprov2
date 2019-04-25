@@ -79,7 +79,7 @@ void handleConnect()
   WiFi.begin(wifissid, wifipwd);
 
   int tryCount = 0;
-  while (WiFi.status() != WL_CONNECTED || tryCount >= 10) {
+  while (WiFi.status() != WL_CONNECTED || tryCount <= 10) {
     delay(1000);
     tryCount++;
   }
