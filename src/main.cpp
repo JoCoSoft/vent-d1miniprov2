@@ -1,6 +1,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 #include "Motor/Motor.h"
+#include "FS.h"
 
 // TODO: Inject const values into board somehow at build time.
 // TODO: How can we persist the fact that the vent has been registered?
@@ -99,6 +100,33 @@ void setup()
   delay(1000); // Helps ensure Serial.print statements work
   Serial.begin(9600);
 
+  delay(1000);
+  Serial.println("Mounting FS...");
+
+  if (!SPIFFS.begin()) {
+    Serial.println("Failed to mount file system");
+    return;
+  }
+
+
+  File configFile = SPIFFS.open("/conf.json", "r");
+  if (!configFile) {
+    Serial.println("Failed to open config file");
+    return;
+  }
+
+  size_t size = configFile.size();
+  if (size > 1024) {
+    Serial.println("Config file size is too large");
+    return;
+  }
+
+  Serial.println("About to read from file");
+  String conf = configFile.readString();
+  Serial.println(conf);
+   Serial.println("Read from file");
+
+/*
   // Configure motor control pins to be output and turned off
   int control_pins_len = (sizeof(MOTOR_CONTROL_PINS) / sizeof(MOTOR_CONTROL_PINS[0]));
   for (int x = 0; x < control_pins_len; x++)
@@ -118,6 +146,7 @@ void setup()
 
   server.on("/connect", handleConnect);
   server.begin();
+*/
 }
 
 void loop()
